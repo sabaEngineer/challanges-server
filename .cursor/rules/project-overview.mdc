@@ -1,0 +1,201 @@
+---
+description: Challenges.me project overview, tech stack, and database schema
+alwaysApply: true
+---
+
+# Challenges.me
+
+Challenges.me is a productivity application where people build good habits and break bad ones together through public, private, and group challenges. Users track their progress daily, share check-ins with their teammates, and stay accountable as a team. Teammates support and compete with each other, creating motivation to keep streaks alive and continuously improve.
+
+## Core Features
+
+- Sign in with Google (with future support for email/password authentication).
+- Send teammate requests and build accountability-based connections.
+- Direct messaging between teammates (text + image messages).
+- Create and join public, teammates-only, or private invite challenges.
+- Complete daily check-ins (success or failed) and share progress via text, image, or video.
+- View a personalized feed showing teammates’ new challenges and check-ins.
+- Track current and best streaks per challenge and compete on challenge-level leaderboards.
+- Receive push notifications and reminders to protect streaks and stay consistent.
+- Access a profile page with a calendar view of daily activities, check-ins, and created challenges.
+
+## Tech Stack
+
+- **Backend**: Node.js with NestJS 
+- **Database**: PostgreSQL hosted on Render.com
+- **ORM**: TypeORM — all DB changes via migrations only, never `synchronize: true`
+- **Hosting**: Render.com (server + database)
+- **Client**: React Native (Android + iOS)
+
+## Authentication
+
+- Google OAuth via React Native client (client sends Google `idToken` to backend)
+- Backend verifies token with `google-auth-library`, finds or creates user
+- Returns JWT (Bearer token) for subsequent requests
+- JWT strategy via Passport (`@nestjs/passport` + `passport-jwt`)
+- Use `@UseGuards(JwtAuthGuard)` and `@CurrentUser()` decorator on protected routes
+- Environment variables: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_ID_IOS`, `JWT_SECRET`, `JWT_EXPIRATION`
+
+## Conventions
+
+- All DB changes must be done through TypeORM migrations only (no manual DB edits).
+- Every entity must include created_at and updated_at timestamps.
+- Swagger documentation must be updated on every API change to stay synchronized.
+- Code must be readable, simple, and logically structured with clear naming.
+- Use `class-validator` decorators on all DTOs.
+- All controllers must have `@ApiTags` and `@ApiOperation` / `@ApiResponse` Swagger decorators.
+
+## Database Schema
+
+### users
+
+| Column     | Type          | Notes                  |
+|------------|---------------|------------------------|
+| id         | uuid (PK)     |                        |
+| googleId   | varchar(255)  | nullable               |
+| firstName  | varchar(255)  | nullable               |
+| lastName   | varchar(255)  | nullable               |
+| picture    | varchar(255)  | nullable               |
+| email      | varchar(255)  |                        |
+| pushToken  | varchar(255)  | nullable, push notification token |
+| skip_build_team | boolean | default false, skip build-your-team flow for returning users |
+| created_at | timestamp     | default now()          |
+| updated_at | timestamp     | auto-updated           |
+
+### teammate_requests
+
+| Column       | Type                         | Notes                    |
+|--------------|------------------------------|--------------------------|
+| id           | uuid (PK)                    |                          |
+| requester_id | uuid (FK -> users)           | who sent the request     |
+| addressee_id | uuid (FK -> users)           | who receives the request |
+| status       | enum teammate_request_status | default 'pending'        |
+| responded_at | timestamp                    | nullable                 |
+| created_at   | timestamp                    | default now()            |
+| updated_at   | timestamp                    | default now()            |
+
+**Enum `teammate_request_status`**: pending, accepted, declined, canceled, blocked
+
+### teammates
+
+| Column      | Type               | Notes       |
+|-------------|--------------------|-------------|
+| user_id     | uuid (FK -> users) | composite PK |
+| teammate_id | uuid (FK -> users) | composite PK |
+| created_at  | timestamp          | default now() |
+
+### notifications
+
+| Column       | Type                    | Notes                                      |
+|--------------|-------------------------|--------------------------------------------|
+| id           | uuid (PK)               |                                            |
+| user_id      | uuid (FK -> users)      | recipient                                  |
+| type         | enum notification_type  | teammate_request, message, reaction_on_*   |
+| actor_id     | uuid (FK -> users)      | nullable, who triggered it                 |
+| subject_type | varchar(100)           | e.g. teammate_request, message, checkin    |
+| subject_id   | uuid                    | nullable, ID of related entity             |
+| payload      | jsonb                   | nullable, extra display data                |
+| read_at      | timestamp               | nullable, when user saw it                  |
+| created_at   | timestamp               | default now()                              |
+| updated_at   | timestamp               | default now()                               |
+
+**Enum `notification_type`**: teammate_request, message, reaction_on_checkin, reaction_on_comment, comment_on_checkin
+**Indexes**: (user_id), (user_id, read_at)
+
+### conversations
+
+| Column          | Type               | Notes                                    |
+|-----------------|--------------------|------------------------------------------|
+| id              | uuid (PK)          |                                          |
+| user1_id        | uuid (FK -> users) | not null                                 |
+| user2_id        | uuid (FK -> users) | not null                                 |
+| pair_key        | varchar(100)       | unique, format: minUUID:maxUUID          |
+| last_message_at | timestamp          | nullable                                 |
+| created_at      | timestamp          | default now()                            |
+| updated_at      | timestamp          | default now()                            |
+
+**Indexes**: (pair_key) unique, (user1_id), (user2_id)
+
+### messages
+
+| Column             | Type                    | Notes              |
+|--------------------|-------------------------|--------------------|
+| id                 | uuid (PK)               |                    |
+| conversation_id    | uuid (FK -> conversations) | not null        |
+| sender_id          | uuid (FK -> users)      | not null           |
+| type               | enum message_type       | default 'text'     |
+| text               | text                    | nullable           |
+| image_url          | text                    | nullable           |
+| image_storage_key  | text                    | nullable           |
+| image_mime_type    | varchar(100)            | nullable           |
+| image_size_bytes   | bigint                  | nullable           |
+| image_width        | int                     | nullable           |
+| image_height       | int                     | nullable           |
+| created_at         | timestamp               | default now()      |
+| updated_at         | timestamp               | default now()      |
+
+**Enum `message_type`**: text, image, system
+**Indexes**: (conversation_id, created_at), (sender_id)
+
+### challenges
+
+| Column            | Type                              | Notes                    |
+|-------------------|-----------------------------------|--------------------------|
+| id                | uuid (PK)                         |                          |
+| title             | varchar                           | not null                 |
+| description       | text                              |                          |
+| imageUrl          | text                              | nullable                 |
+| visibility        | enum challenge_visibility         | default 'public'         |
+| type              | enum challenge_types              | not null                 |
+| media_requirement | enum checkin_media_requirement    | default 'none'           |
+| start_date        | date                              | not null                 |
+| end_date          | date                              | nullable                 |
+| created_by        | uuid (FK -> users)                | not null                 |
+| created_at        | timestamp                         | default now()            |
+
+**Enum `challenge_visibility`**: public, teammates_only, private_invite
+**Enum `challenge_types`**: strict, flexible
+**Enum `checkin_media_requirement`**: none, image_or_video_required, image_required, video_required
+
+### challenge_members
+
+| Column         | Type                  | Notes                              |
+|----------------|-----------------------|------------------------------------|
+| id             | uuid (PK)             |                                    |
+| challenge_id   | uuid (FK -> challenges) | composite unique with user_id    |
+| user_id        | uuid (FK -> users)    |                                    |
+| joined_at      | timestamp             | default now()                      |
+| status         | varchar               | active / left / removed / pending  |
+| current_streak | int                   | default 0                          |
+| best_streak    | int                   | default 0                          |
+
+**Indexes**: (challenge_id, user_id) unique, (user_id)
+
+### challenge_checkins
+
+| Column       | Type                      | Notes                              |
+|--------------|---------------------------|------------------------------------|
+| id           | uuid (PK)                 |                                    |
+| challenge_id | uuid (FK -> challenges)   | denormalized for query speed       |
+| user_id      | uuid (FK -> users)        | denormalized for query speed       |
+| member_id    | uuid (FK -> challenge_members) |                               |
+| checkin_date | date                      | the day being checked in           |
+| status       | enum checkin_status       | success or failed                  |
+| text         | text                      | nullable                           |
+| created_at   | timestamp                 | default now()                      |
+| updated_at   | timestamp                 | default now()                      |
+
+**Enum `checkin_status`**: success, failed
+**Indexes**: (member_id, checkin_date) unique, (challenge_id, checkin_date), (user_id, checkin_date), (created_at)
+
+### checkin_media
+
+| Column     | Type                        | Notes       |
+|------------|-----------------------------|-------------|
+| id         | uuid (PK)                   |             |
+| checkin_id | uuid (FK -> challenge_checkins) |         |
+| type       | enum post_media_type        | image/video |
+| url        | text                        | not null    |
+| created_at | timestamp                   | default now() |
+
+**Enum `post_media_type`**: image, video
