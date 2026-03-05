@@ -7,6 +7,7 @@ import { ChallengeMember } from '../challenges/entities/challenge-member.entity'
 import { Teammate } from '../teammates/entities/teammate.entity';
 import { ChallengeVisibility } from '../challenges/entities/challenge.entity';
 import { PostsService } from '../posts/posts.service';
+import { formatUserForResponse } from './badge';
 
 @Injectable()
 export class UsersService {
@@ -69,12 +70,7 @@ export class UsersService {
     );
 
     return {
-      id: user.id,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      picture: user.picture,
-      email: user.email,
-      created_at: user.created_at,
+      ...formatUserForResponse(user, { email: user.email, created_at: user.created_at }),
       recent_posts: recentPosts,
     };
   }

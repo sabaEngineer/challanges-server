@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseUUIDPipe,
@@ -23,6 +24,7 @@ import {
   RequestType,
 } from './dto/teammate-requests-query.dto';
 import { TeammateSuggestionsQueryDto } from './dto/suggestions-query.dto';
+import { UpdateFavoriteDto } from './dto/update-favorite.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { User } from '../users/user.entity';
@@ -82,6 +84,32 @@ export class TeammatesController {
   async getCount(@CurrentUser() user: User) {
     const count = await this.teammatesService.getTeammatesCount(user.id);
     return { count };
+  }
+
+  @Patch(':id/favorite')
+  @ApiOperation({ summary: 'Mark or unmark teammate as favorite' })
+  @ApiResponse({ status: 200, description: 'Favorite status updated' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Teammate not found' })
+  async updateFavorite(
+    @CurrentUser() user: User,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateFavoriteDto,
+  ) {
+    return this.teammatesService.updateFavorite(user.id, id, dto.is_favorite);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Remove a teammate' })
+  @ApiResponse({ status: 200, description: 'Teammate removed' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Teammate not found' })
+  async removeTeammate(
+    @CurrentUser() user: User,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    await this.teammatesService.removeTeammate(user.id, id);
+    return { success: true };
   }
 
   @Get()

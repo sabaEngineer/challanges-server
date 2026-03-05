@@ -48,4 +48,11 @@ export class CreateChallengeDto {
   @IsOptional()
   @IsDateString()
   end_date?: string;
+
+  @ApiPropertyOptional({
+    description: 'System advice/tips for users (admin only). Shown when user asks for help.',
+  })
+  @IsOptional()
+  @IsString()
+  system_advice?: string;
 }

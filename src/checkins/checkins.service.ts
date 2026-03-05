@@ -10,10 +10,16 @@ import { ChallengeCheckin } from '../challenges/entities/challenge-checkin.entit
 import { CheckinMedia } from '../challenges/entities/checkin-media.entity';
 import { ChallengeMember } from '../challenges/entities/challenge-member.entity';
 import { Challenge } from '../challenges/entities/challenge.entity';
+import { Teammate } from '../teammates/entities/teammate.entity';
+import { User } from '../users/user.entity';
 import { CheckinStatus } from '../challenges/entities/challenge-checkin.entity';
 import { PostMediaType } from '../challenges/entities/checkin-media.entity';
 import { CreateCheckinDto } from './dto/create-checkin.dto';
 import { UpdateCheckinDto } from './dto/update-checkin.dto';
+import { getBadge } from '../users/badge';
+import { PostsService } from '../posts/posts.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationType } from '../notifications/entities/notification.entity';
 
 @Injectable()
 export class CheckinsService {
@@ -26,6 +32,12 @@ export class CheckinsService {
     private readonly membersRepository: Repository<ChallengeMember>,
     @InjectRepository(Challenge)
     private readonly challengesRepository: Repository<Challenge>,
+    @InjectRepository(User)
+    private readonly usersRepository: Repository<User>,
+    @InjectRepository(Teammate)
+    private readonly teammatesRepository: Repository<Teammate>,
+    private readonly postsService: PostsService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async create(userId: string, challengeId: string, dto: CreateCheckinDto) {
@@ -80,6 +92,23 @@ export class CheckinsService {
     }
 
     await this.updateStreak(member, dto.status, checkinDate);
+
+    if (dto.status === CheckinStatus.SUCCESS) {
+      const userBefore = await this.usersRepository.findOne({
+        where: { id: userId },
+        select: ['total_checkins'],
+      });
+      const badgeBefore = getBadge(userBefore?.total_checkins ?? 0);
+      await this.usersRepository.increment({ id: userId }, 'total_checkins', 1);
+      const userAfter = await this.usersRepository.findOne({
+        where: { id: userId },
+        select: ['total_checkins'],
+      });
+      const badgeAfter = getBadge(userAfter?.total_checkins ?? 0);
+      if (badgeAfter && (!badgeBefore || badgeAfter.level > badgeBefore.level)) {
+        await this.onBadgeEarned(userId, challengeId, saved.id, badgeAfter.name);
+      }
+    }
 
     return this.checkinsRepository.findOne({
       where: { id: saved.id },
@@ -141,12 +170,66 @@ export class CheckinsService {
 
     if (dto.status !== undefined && dto.status !== previousStatus) {
       await this.updateStreak(member, dto.status, today);
+      if (previousStatus === CheckinStatus.SUCCESS && dto.status === CheckinStatus.FAILED) {
+        await this.usersRepository.decrement({ id: userId }, 'total_checkins', 1);
+      } else if (previousStatus === CheckinStatus.FAILED && dto.status === CheckinStatus.SUCCESS) {
+        const userBefore = await this.usersRepository.findOne({
+          where: { id: userId },
+          select: ['total_checkins'],
+        });
+        const badgeBefore = getBadge(userBefore?.total_checkins ?? 0);
+        await this.usersRepository.increment({ id: userId }, 'total_checkins', 1);
+        const userAfter = await this.usersRepository.findOne({
+          where: { id: userId },
+          select: ['total_checkins'],
+        });
+        const badgeAfter = getBadge(userAfter?.total_checkins ?? 0);
+        if (badgeAfter && (!badgeBefore || badgeAfter.level > badgeBefore.level)) {
+          await this.onBadgeEarned(userId, challengeId, checkin.id, badgeAfter.name);
+        }
+      }
     }
 
     return this.checkinsRepository.findOne({
       where: { id: checkin.id },
       relations: ['media'],
     });
+  }
+
+  private async onBadgeEarned(
+    userId: string,
+    challengeId: string,
+    checkinId: string,
+    badgeName: string,
+  ): Promise<void> {
+    const post = await this.postsService.createBadgeEarnedPost(
+      userId,
+      challengeId,
+      checkinId,
+      badgeName,
+    );
+
+    const teammateRows = await this.teammatesRepository.find({
+      where: [
+        { user_id: userId },
+        { teammate_id: userId },
+      ],
+    });
+    const teammateIds = new Set<string>();
+    for (const t of teammateRows) {
+      const other = t.user_id === userId ? t.teammate_id : t.user_id;
+      if (other !== userId) teammateIds.add(other);
+    }
+    for (const teammateId of teammateIds) {
+      await this.notificationsService.create({
+        userId: teammateId,
+        type: NotificationType.BADGE_EARNED,
+        actorId: userId,
+        subjectType: 'post',
+        subjectId: post.id,
+        payload: { badge_name: badgeName },
+      });
+    }
   }
 
   private getTodayDate(): string {

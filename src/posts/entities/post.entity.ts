@@ -25,6 +25,8 @@ export enum PostShareType {
   HONESTY = 'honesty',
   SUPPORT = 'support',
   GENERAL = 'general',
+  CHALLENGE_CREATED = 'challenge_created',
+  BADGE_EARNED = 'badge_earned',
 }
 
 @Entity('posts')

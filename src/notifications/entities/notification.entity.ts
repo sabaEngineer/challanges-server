@@ -16,6 +16,9 @@ export enum NotificationType {
   REACTION_ON_COMMENT = 'reaction_on_comment',
   COMMENT_ON_CHECKIN = 'comment_on_checkin',
   POST_LIKE = 'post_like',
+  CHALLENGE_CREATED = 'challenge_created',
+  CHALLENGE_INVITE = 'challenge_invite',
+  BADGE_EARNED = 'badge_earned',
 }
 
 @Entity('notifications')

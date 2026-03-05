@@ -30,6 +30,7 @@ import { UpdateCheckinDto } from '../checkins/dto/update-checkin.dto';
 import { CheckinsService } from '../checkins/checkins.service';
 import { PostsService } from '../posts/posts.service';
 import { PostsQueryDto } from '../posts/dto/posts-query.dto';
+import { InviteTeammatesDto } from './dto/invite-teammates.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { User } from '../users/user.entity';
@@ -53,7 +54,7 @@ export class ChallengesController {
     @CurrentUser() user: User,
     @Body() dto: CreateChallengeDto,
   ) {
-    return this.challengesService.create(user.id, dto);
+    return this.challengesService.create(user, dto);
   }
 
   @Delete(':id')
@@ -81,7 +82,7 @@ export class ChallengesController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateChallengeDto,
   ) {
-    return this.challengesService.update(user.id, id, dto);
+    return this.challengesService.update(user, id, dto);
   }
 
   @Patch(':id/checkin')
@@ -140,6 +141,37 @@ export class ChallengesController {
     return this.challengesService.findByUser(user.id);
   }
 
+  @Get('invites')
+  @ApiOperation({ summary: 'List pending challenge invites for the current user' })
+  @ApiResponse({ status: 200, description: 'List of pending invites' })
+  async getMyInvites(@CurrentUser() user: User) {
+    return this.challengesService.getMyInvites(user.id);
+  }
+
+  @Post(':id/invite')
+  @ApiOperation({ summary: 'Invite teammates to a private invite challenge (creator only)' })
+  @ApiResponse({ status: 201, description: 'Invites sent' })
+  @ApiResponse({ status: 403, description: 'Only creator can invite' })
+  @ApiResponse({ status: 404, description: 'Challenge not found' })
+  async inviteTeammates(
+    @CurrentUser() user: User,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: InviteTeammatesDto,
+  ) {
+    return this.challengesService.inviteTeammates(user.id, id, dto.user_ids);
+  }
+
+  @Patch(':id/invite/decline')
+  @ApiOperation({ summary: 'Decline a challenge invite' })
+  @ApiResponse({ status: 200, description: 'Invite declined' })
+  @ApiResponse({ status: 404, description: 'Invite not found' })
+  async declineInvite(
+    @CurrentUser() user: User,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.challengesService.declineInvite(user.id, id);
+  }
+
   @Get(':id/posts')
   @ApiOperation({ summary: 'Get challenge posts (paginated)' })
   @ApiResponse({ status: 200, description: 'Paginated list of posts' })
@@ -179,12 +211,15 @@ export class ChallengesController {
   @Get(':id/members')
   @ApiOperation({ summary: 'Get challenge members with streaks (paginated)' })
   @ApiResponse({ status: 200, description: 'Paginated list of members' })
+  @ApiResponse({ status: 403, description: 'No access to this challenge' })
   @ApiResponse({ status: 404, description: 'Challenge not found' })
   async getMembers(
+    @CurrentUser() user: User,
     @Param('id', ParseUUIDPipe) id: string,
     @Query() query: ChallengeMembersQueryDto,
   ) {
     return this.challengesService.findMembers(
+      user.id,
       id,
       query.page,
       query.limit,
@@ -195,8 +230,9 @@ export class ChallengesController {
   @Get(':id')
   @ApiOperation({ summary: 'Get a challenge by ID' })
   @ApiResponse({ status: 200, description: 'Challenge details' })
+  @ApiResponse({ status: 403, description: 'No access to this challenge' })
   @ApiResponse({ status: 404, description: 'Challenge not found' })
-  async findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.challengesService.findById(id);
+  async findOne(@CurrentUser() user: User, @Param('id', ParseUUIDPipe) id: string) {
+    return this.challengesService.findById(id, user.id);
   }
 }

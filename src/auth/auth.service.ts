@@ -5,6 +5,7 @@ import { OAuth2Client } from 'google-auth-library';
 import { UsersService } from '../users/users.service';
 import { User } from '../users/user.entity';
 import { AuthResponseDto } from './dto/auth-response.dto';
+import { formatUserForResponse } from '../users/badge';
 
 @Injectable()
 export class AuthService {
@@ -33,14 +34,10 @@ export class AuthService {
 
     return {
       accessToken,
-      user: {
-        id: user.id,
+      user: formatUserForResponse(user, {
         email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        picture: user.picture,
         skip_build_team: user.skip_build_team,
-      },
+      }) as AuthResponseDto['user'],
     };
   }
 

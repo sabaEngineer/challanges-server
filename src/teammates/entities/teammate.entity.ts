@@ -1,6 +1,7 @@
 import {
   Entity,
   PrimaryColumn,
+  Column,
   CreateDateColumn,
   ManyToOne,
   JoinColumn,
@@ -14,6 +15,9 @@ export class Teammate {
 
   @PrimaryColumn({ type: 'uuid' })
   teammate_id: string;
+
+  @Column({ type: 'boolean', default: false })
+  is_favorite: boolean;
 
   @ManyToOne(() => User)
   @JoinColumn({ name: 'user_id' })

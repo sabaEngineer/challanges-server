@@ -11,6 +11,7 @@ import { AuthResponseDto } from './dto/auth-response.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { User } from '../users/user.entity';
+import { formatUserForResponse } from '../users/badge';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -32,13 +33,9 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Current user profile' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getMe(@CurrentUser() user: User) {
-    return {
-      id: user.id,
+    return formatUserForResponse(user, {
       email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      picture: user.picture,
       skip_build_team: user.skip_build_team,
-    };
+    });
   }
 }

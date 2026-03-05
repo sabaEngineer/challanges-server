@@ -65,6 +65,9 @@ export class Challenge {
   @Column({ type: 'date', nullable: true })
   end_date: string;
 
+  @Column({ type: 'text', nullable: true })
+  system_advice: string;
+
   @Column({ type: 'uuid' })
   created_by: string;
 

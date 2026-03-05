@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
-import { Post } from './entities/post.entity';
+import { Post, PostShareType } from './entities/post.entity';
 import { PostMedia } from './entities/post-media.entity';
 import { PostLike } from './entities/post-like.entity';
 import { PostComment } from './entities/post-comment.entity';
@@ -22,6 +22,7 @@ import { Challenge } from '../challenges/entities/challenge.entity';
 import { ChallengeVisibility } from '../challenges/entities/challenge.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '../notifications/entities/notification.entity';
+import { formatUserForResponse } from '../users/badge';
 
 @Injectable()
 export class PostsService {
@@ -111,6 +112,36 @@ export class PostsService {
     }
 
     return this.findOneForResponse(saved.id, userId);
+  }
+
+  async createChallengeCreatedPost(
+    userId: string,
+    challengeId: string,
+    text?: string,
+  ): Promise<Post> {
+    const post = this.postsRepository.create({
+      user_id: userId,
+      challenge_id: challengeId,
+      share_type: PostShareType.CHALLENGE_CREATED,
+      text: text ?? null,
+    });
+    return this.postsRepository.save(post);
+  }
+
+  async createBadgeEarnedPost(
+    userId: string,
+    challengeId: string,
+    checkinId: string,
+    badgeName: string,
+  ): Promise<Post> {
+    const post = this.postsRepository.create({
+      user_id: userId,
+      challenge_id: challengeId,
+      checkin_id: checkinId,
+      share_type: PostShareType.BADGE_EARNED,
+      text: badgeName,
+    });
+    return this.postsRepository.save(post);
   }
 
   async update(userId: string, postId: string, dto: UpdatePostDto) {
@@ -338,14 +369,7 @@ export class PostsService {
       likes_count,
       is_liked_by_me: isLiked,
       created_at: comment.created_at,
-      user: comment.user
-        ? {
-            id: comment.user.id,
-            firstName: comment.user.firstName,
-            lastName: comment.user.lastName,
-            picture: comment.user.picture,
-          }
-        : null,
+      user: comment.user ? formatUserForResponse(comment.user) : null,
     };
   }
 
@@ -380,14 +404,7 @@ export class PostsService {
       likes_count: countMap.get(comment.id) ?? 0,
       is_liked_by_me: likedCommentIds.has(comment.id),
       created_at: comment.created_at,
-      user: comment.user
-        ? {
-            id: comment.user.id,
-            firstName: comment.user.firstName,
-            lastName: comment.user.lastName,
-            picture: comment.user.picture,
-          }
-        : null,
+      user: comment.user ? formatUserForResponse(comment.user) : null,
     }));
   }
 
@@ -670,12 +687,7 @@ export class PostsService {
               likes_count: lastCommentLikeMap.get(lastComment.id) ?? 0,
               is_liked_by_me: lastCommentLikedByMe.has(lastComment.id),
               user: lastComment.user
-                ? {
-                    id: lastComment.user.id,
-                    firstName: lastComment.user.firstName,
-                    lastName: lastComment.user.lastName,
-                    picture: lastComment.user.picture,
-                  }
+                ? formatUserForResponse(lastComment.user)
                 : null,
             }
           : null,
@@ -718,12 +730,7 @@ export class PostsService {
         likes_count: lcLikes,
         is_liked_by_me: lcLikedByMe,
         user: lastComment.user
-          ? {
-              id: lastComment.user.id,
-              firstName: lastComment.user.firstName,
-              lastName: lastComment.user.lastName,
-              picture: lastComment.user.picture,
-            }
+          ? formatUserForResponse(lastComment.user)
           : null,
       };
     }
@@ -741,14 +748,7 @@ export class PostsService {
       last_comment,
       created_at: post.created_at,
       updated_at: post.updated_at,
-      user: post.user
-        ? {
-            id: post.user.id,
-            firstName: post.user.firstName,
-            lastName: post.user.lastName,
-            picture: post.user.picture,
-          }
-        : null,
+      user: post.user ? formatUserForResponse(post.user) : null,
       challenge: post.challenge
         ? { id: post.challenge.id, title: post.challenge.title }
         : null,
@@ -780,14 +780,7 @@ export class PostsService {
       share_type: post.share_type,
       text: post.text,
       created_at: post.created_at,
-      user: post.user
-        ? {
-            id: post.user.id,
-            firstName: post.user.firstName,
-            lastName: post.user.lastName,
-            picture: post.user.picture,
-          }
-        : null,
+      user: post.user ? formatUserForResponse(post.user) : null,
       challenge: post.challenge
         ? { id: post.challenge.id, title: post.challenge.title }
         : null,

@@ -190,6 +190,38 @@ export class TeammatesService {
     };
   }
 
+  async updateFavorite(
+    userId: string,
+    teammateId: string,
+    isFavorite: boolean,
+  ) {
+    const record = await this.teammatesRepository.findOne({
+      where: { user_id: userId, teammate_id: teammateId },
+    });
+    if (!record) {
+      throw new NotFoundException('Teammate not found');
+    }
+    record.is_favorite = isFavorite;
+    await this.teammatesRepository.save(record);
+    return { is_favorite: isFavorite };
+  }
+
+  async removeTeammate(userId: string, teammateId: string): Promise<void> {
+    if (userId === teammateId) {
+      throw new ForbiddenException('Cannot remove yourself');
+    }
+
+    const exists = await this.teammatesRepository.findOne({
+      where: { user_id: userId, teammate_id: teammateId },
+    });
+    if (!exists) {
+      throw new NotFoundException('Teammate not found');
+    }
+
+    await this.teammatesRepository.delete({ user_id: userId, teammate_id: teammateId });
+    await this.teammatesRepository.delete({ user_id: teammateId, teammate_id: userId });
+  }
+
   async getTeammatesCount(userId: string): Promise<number> {
     return this.teammatesRepository.count({
       where: { user_id: userId },
@@ -200,7 +232,7 @@ export class TeammatesService {
     const [items, total] = await this.teammatesRepository.findAndCount({
       where: { user_id: userId },
       relations: ['teammate'],
-      order: { created_at: 'DESC' },
+      order: { is_favorite: 'DESC', created_at: 'DESC' },
       skip: (page - 1) * limit,
       take: limit,
     });
@@ -213,6 +245,7 @@ export class TeammatesService {
         picture: t.teammate?.picture,
         email: t.teammate?.email,
         created_at: t.created_at,
+        is_favorite: t.is_favorite ?? false,
       })),
       total,
       page,
