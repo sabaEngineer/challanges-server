@@ -439,8 +439,43 @@ export class PostsService {
       take: limit,
     });
 
+    if (posts.length > 0) {
+      const items = await this.enrichPostsWithLikes(posts, userId);
+      return { items, total, page, limit, is_discover: false };
+    }
+
+    return this.getDiscoverFeed(userId, page, limit);
+  }
+
+  private async getDiscoverFeed(userId: string, page: number, limit: number) {
+    const publicChallengeIds = await this.challengesRepository
+      .createQueryBuilder('c')
+      .select('c.id', 'id')
+      .where('c.visibility = :visibility', { visibility: ChallengeVisibility.PUBLIC })
+      .getRawMany();
+
+    if (publicChallengeIds.length === 0) {
+      return { items: [], total: 0, page, limit, is_discover: true };
+    }
+
+    const challengeIds = publicChallengeIds.map((c) => c.id);
+
+    const [posts, total] = await this.postsRepository
+      .createQueryBuilder('p')
+      .leftJoinAndSelect('p.user', 'user')
+      .leftJoinAndSelect('p.challenge', 'challenge')
+      .leftJoinAndSelect('p.checkin', 'checkin')
+      .leftJoinAndSelect('checkin.member', 'member')
+      .leftJoinAndSelect('p.media', 'media')
+      .where('p.challenge_id IN (:...challengeIds)', { challengeIds })
+      .andWhere('p.user_id != :userId', { userId })
+      .orderBy('p.created_at', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
+
     const items = await this.enrichPostsWithLikes(posts, userId);
-    return { items, total, page, limit };
+    return { items, total, page, limit, is_discover: true };
   }
 
   async getByChallenge(userId: string, challengeId: string, page: number, limit: number) {
