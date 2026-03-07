@@ -785,7 +785,13 @@ export class PostsService {
       updated_at: post.updated_at,
       user: post.user ? formatUserForResponse(post.user) : null,
       challenge: post.challenge
-        ? { id: post.challenge.id, title: post.challenge.title }
+        ? {
+            id: post.challenge.id,
+            title: post.challenge.title,
+            visibility: post.challenge.visibility,
+            imageUrl: post.challenge.imageUrl,
+            description: post.challenge.description,
+          }
         : null,
       checkin: post.checkin
         ? {
@@ -817,7 +823,13 @@ export class PostsService {
       created_at: post.created_at,
       user: post.user ? formatUserForResponse(post.user) : null,
       challenge: post.challenge
-        ? { id: post.challenge.id, title: post.challenge.title }
+        ? {
+            id: post.challenge.id,
+            title: post.challenge.title,
+            visibility: post.challenge.visibility,
+            imageUrl: post.challenge.imageUrl,
+            description: post.challenge.description,
+          }
         : null,
       checkin: post.checkin
         ? {
